@@ -41,24 +41,28 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 // Set CSRF cookie for all requests
-app.use(setCsrfCookie);
-// Apply CSRF protection to all API routes
-app.use(csrfProtection);
+// app.use(setCsrfCookie);
+// // Apply CSRF protection to all API routes
+// app.use(csrfProtection);
 
 
 import communityRoutes from "./modules/community/community.routes";
 import userProfileRoutes from "./modules/user-profile/user-profile.routes";
 
-// routes
-app.use("/api/auth", authRoutes);
-app.use("/api/user-preferences", userPreferencesRoutes);
-app.use("/api/user-profile", userProfileRoutes);
-app.use("/api/merchant-profile", merchantProfileRoutes);
-app.use("/api/deals", dealsRoutes);
-app.use("/api/ai", aiRoutes);
+app.use(setCsrfCookie); // keep this globally
+
+// public routes (NO CSRF)
 app.use("/api/public/deals", publicDealsRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/deal-requests", dealRequestsRoutes);
-app.use("/api/community", communityRoutes);
+
+// protected routes
+app.use("/api/auth", csrfProtection, authRoutes);
+app.use("/api/user-preferences", csrfProtection, userPreferencesRoutes);
+app.use("/api/user-profile", csrfProtection, userProfileRoutes);
+app.use("/api/merchant-profile", csrfProtection, merchantProfileRoutes);
+app.use("/api/deals", csrfProtection, dealsRoutes);
+app.use("/api/ai", csrfProtection, aiRoutes);
+app.use("/api/admin", csrfProtection, adminRoutes);
+app.use("/api/deal-requests", csrfProtection, dealRequestsRoutes);
+app.use("/api/community", csrfProtection, communityRoutes);
 
 export default app;
