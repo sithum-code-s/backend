@@ -20,7 +20,7 @@ app.use(
         "http://localhost:5173",        // Web app
         "http://localhost:3000",        // Backend itself
         "http://10.0.2.2:3000",         // Android emulator
-        "https://frontend-beyond-isla-40.vercel.app/",
+        "https://frontend-beyond-isla-40.vercel.app",
         /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Local network devices
       ];
       
