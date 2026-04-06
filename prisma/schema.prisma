@@ -1,0 +1,583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum UserStatus {
+  active
+  suspended
+}
+
+enum DealVariantStatus {
+  active
+  sold_out
+  cancelled
+}
+
+enum VariantSlotStatus {
+  available
+  booked
+  locked
+  cancelled
+}
+
+enum LockStatus {
+  active
+  expired
+  converted
+}
+
+enum BookingStatus {
+  pending
+  paid
+  failed
+}
+
+enum AccommodationBookingStatus {
+  confirmed
+  cancelled
+}
+
+enum RecurringType {
+  once
+  interval
+  daily
+  weekly
+}
+
+enum MerchantVerificationStatus {
+  pending
+  verified
+}
+
+enum DealRequestStatus {
+  new
+  contacted
+  closed
+}
+
+//////////////////////////////////////////////////////
+// USER
+//////////////////////////////////////////////////////
+
+model User {
+  id            String     @id
+  name          String
+  email         String     @unique
+  contactNumber String?
+  address       String?
+  city          String?
+  country       String?
+  isTraveller   Boolean    @default(true)
+  isMerchant    Boolean    @default(false)
+  isAdmin       Boolean    @default(false)
+  status        UserStatus @default(active)
+
+  createdAt DateTime @default(now())
+
+  merchantProfile MerchantProfile?
+  preferences     UserPreference?
+
+  searchLogs SearchLog[]
+  dealLocks  DealLock[]
+  bookings   Booking[]
+
+  accommodationLocks    AccommodationLock[]
+  accommodationBookings AccommodationBooking[]
+
+  posts    CommunityPost[]
+  comments CommunityComment[]
+  likes    CommunityLike[]
+
+  dealRequests DealRequest[]
+}
+
+//////////////////////////////////////////////////////
+// MERCHANT
+//////////////////////////////////////////////////////
+
+model MerchantProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  businessName        String
+  businessDescription String
+  contactNumber       String?
+  logoUrl             String?
+  address             String?
+  city                String?
+  country             String?
+  verificationStatus  MerchantVerificationStatus @default(pending)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deals      Deal[]
+  properties Property[]
+}
+
+//////////////////////////////////////////////////////
+// USER PREFERENCES (AI READY)
+//////////////////////////////////////////////////////
+
+model UserPreference {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  // Travel Style & Interests
+  travelStyle        Json?
+  activityInterests  Json?
+
+  // Budget Preferences
+  budgetMin          Float?
+  budgetMax          Float?
+
+  // Location & Accommodation
+  preferredLocations Json?
+  accommodationTypes Json?
+
+  // Trip Details
+  tripDuration        String?
+  travelGroupType     String?
+  transportPreference String?
+
+  // Diving Preferences
+  diverLevel          String? // 'beginner', 'intermediate', 'advanced', 'instructor'
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////////
+// SEARCH LOGS
+//////////////////////////////////////////////////////
+
+model SearchLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  query     String?
+  filters   Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+//////////////////////////////////////////////////////
+// DEAL REQUESTS
+//////////////////////////////////////////////////////
+
+model DealRequest {
+  id            String           @id @default(uuid())
+  userId        String
+  message       String
+  contactNumber String
+  status        DealRequestStatus @default(new)
+  createdAt     DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////////
+// DEALS
+//////////////////////////////////////////////////////
+
+model Deal {
+  id         String @id @default(uuid())
+  merchantId String
+
+  title       String?
+  description String?
+  location    String?
+  category    String?
+
+  durationType  String?
+  durationDays  Int?
+  durationHours Int?
+
+  dealPrice      Float?
+  originalPrice  Float?
+  displayedPrice Float?
+
+  primaryImageUrl String?
+  secondImageUrl  String?
+  thirdImageUrl   String?
+  fourthImageUrl  String?
+
+  dealLockExpireTime Int?
+  isActive           Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  itineraries    Itinerary[]
+  variants       DealVariant[]
+  recurringRules RecurringRule[]
+
+  locks    DealLock[]
+  bookings Booking[]
+
+  inclusions Inclusions[]
+  exclusions Exclusions[]
+}
+
+//////////////////////////////////////////////////////
+// ITINERARY
+//////////////////////////////////////////////////////
+
+model Itinerary {
+  id     String @id @default(uuid())
+  dealId String
+
+  dayNumber   Int?
+  title       String?
+  description String?
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////////
+// RECURRING RULES
+//////////////////////////////////////////////////////
+
+model RecurringRule {
+  id     String @id @default(uuid())
+  dealId String
+
+  repeatType RecurringType
+  daysOfWeek Int[]
+  interval   Int?
+
+  startDate     DateTime?
+  endDate       DateTime?
+  timeOfDay     String? // HH:mm format
+  totalSlots    Int?
+  priceOverride Float?
+
+  isActive          Boolean   @default(true)
+  lastGeneratedDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  variants DealVariant[]
+}
+
+//////////////////////////////////////////////////////
+// DEAL VARIANTS
+//////////////////////////////////////////////////////
+
+model DealVariant {
+  id     String  @id @default(uuid())
+  dealId String
+  ruleId String?
+
+  title String?
+
+  dealPrice      Float?
+  originalPrice  Float?
+  displayedPrice Float?
+
+  startDatetime DateTime?
+  endDatetime   DateTime?
+
+  totalSlots     Int?
+  availableSlots Int?
+
+  status DealVariantStatus @default(active)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  rule RecurringRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  locks    DealLock[]
+  bookings Booking[]
+  slots    VariantSlot[]
+
+  @@unique([dealId, startDatetime])
+}
+
+model VariantSlot {
+  id        String            @id @default(uuid())
+  variantId String
+  slotNumber Int
+  status    VariantSlotStatus @default(available)
+
+  variant   DealVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locks     DealLock[]  @relation("SlotLocks")
+  bookings  Booking[]   @relation("SlotBookings")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//////////////////////////////////////////////////////
+// DEAL LOCKS
+//////////////////////////////////////////////////////
+
+model DealLock {
+  id        String  @id @default(uuid())
+  userId    String?
+  dealId    String?
+  variantId String?
+
+  quantity    Int?
+  lockedPrice Float?
+  expiresAt   DateTime?
+
+  status    LockStatus
+  createdAt DateTime   @default(now())
+
+  user    User?        @relation(fields: [userId], references: [id])
+  deal    Deal?        @relation(fields: [dealId], references: [id])
+  variant DealVariant? @relation(fields: [variantId], references: [id])
+  slots   VariantSlot[] @relation("SlotLocks")
+
+  bookings Booking[]
+}
+
+//////////////////////////////////////////////////////
+// BOOKINGS
+//////////////////////////////////////////////////////
+
+model Booking {
+  id        String  @id @default(uuid())
+  userId    String?
+  dealId    String?
+  variantId String?
+  lockId    String?
+
+  quantity      Int?
+  totalPrice    Float?
+  paymentStatus BookingStatus
+  qrCode        String?
+
+  createdAt DateTime @default(now())
+
+  user    User?        @relation(fields: [userId], references: [id])
+  deal    Deal?        @relation(fields: [dealId], references: [id])
+  variant DealVariant? @relation(fields: [variantId], references: [id])
+  lock    DealLock?    @relation(fields: [lockId], references: [id])
+  slots   VariantSlot[] @relation("SlotBookings")
+}
+
+//////////////////////////////////////////////////////
+// PROPERTIES (HOTELS)
+//////////////////////////////////////////////////////
+
+model Property {
+  id         String @id @default(uuid())
+  merchantId String
+
+  name        String?
+  description String?
+  location    String?
+
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+
+  createdAt DateTime @default(now())
+
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  roomTypes RoomType[]
+}
+
+//////////////////////////////////////////////////////
+// ROOM TYPES
+//////////////////////////////////////////////////////
+
+model RoomType {
+  id         String @id @default(uuid())
+  propertyId String
+
+  name        String?
+  description String?
+  capacity    Int?
+
+  offerPrice    Float?
+  originalPrice Float?
+  finalPrice    Float?
+
+  createdAt DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  inventory RoomInventory[]
+  locks     AccommodationLock[]
+  bookings  AccommodationBooking[]
+}
+
+//////////////////////////////////////////////////////
+// INCLUSIONS / EXCLUSIONS
+//////////////////////////////////////////////////////
+
+model Inclusions {
+  id          String  @id @default(uuid())
+  dealId      String
+  description String?
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model Exclusions {
+  id              String  @id @default(uuid())
+  dealId          String
+  description     String?
+  additionalPrice Float?
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+//////////////////////////////////////////////////////
+// ROOM INVENTORY
+//////////////////////////////////////////////////////
+
+model RoomInventory {
+  id         String @id @default(uuid())
+  roomTypeId String
+
+  date DateTime
+
+  totalRooms     Int?
+  availableRooms Int?
+
+  offerPrice    Float?
+  originalPrice Float?
+  finalPrice    Float?
+
+  roomType RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([roomTypeId, date])
+}
+
+//////////////////////////////////////////////////////
+// ACCOMMODATION LOCKS
+//////////////////////////////////////////////////////
+
+model AccommodationLock {
+  id         String @id @default(uuid())
+  userId     String
+  roomTypeId String
+
+  checkIn  DateTime
+  checkOut DateTime
+
+  numberOfRooms Int?
+  expiresAt     DateTime?
+
+  status    LockStatus
+  createdAt DateTime   @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  roomType RoomType @relation(fields: [roomTypeId], references: [id])
+
+  bookings AccommodationBooking[]
+}
+
+//////////////////////////////////////////////////////
+// ACCOMMODATION BOOKINGS
+//////////////////////////////////////////////////////
+
+model AccommodationBooking {
+  id         String  @id @default(uuid())
+  userId     String
+  lockId     String?
+  roomTypeId String
+
+  checkIn  DateTime
+  checkOut DateTime
+
+  numberOfRooms Int?
+  totalPrice    Float?
+
+  status AccommodationBookingStatus
+
+  createdAt DateTime @default(now())
+
+  user     User               @relation(fields: [userId], references: [id])
+  lock     AccommodationLock? @relation(fields: [lockId], references: [id])
+  roomType RoomType           @relation(fields: [roomTypeId], references: [id])
+}
+
+//////////////////////////////////////////////////////
+// COMMUNITY
+//////////////////////////////////////////////////////
+
+model CommunityPost {
+  id      String @id @default(uuid())
+  userId  String
+  content String
+
+  category String?
+  tags     String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comments CommunityComment[]
+  likes    CommunityLike[]
+  media    CommunityMedia[]
+}
+
+model CommunityComment {
+  id       String  @id @default(uuid())
+  postId   String
+  userId   String
+  parentId String?
+
+  content   String
+  createdAt DateTime @default(now())
+
+  post   CommunityPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User              @relation(fields: [userId], references: [id])
+  parent CommunityComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+
+  replies CommunityComment[] @relation("CommentReplies")
+  likes   CommunityLike[]
+  media   CommunityMedia[]
+}
+
+model CommunityLike {
+  id        String  @id @default(uuid())
+  userId    String
+  postId    String?
+  commentId String?
+
+  createdAt DateTime @default(now())
+
+  user    User              @relation(fields: [userId], references: [id])
+  post    CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, commentId])
+}
+
+model CommunityMedia {
+  id        String  @id @default(uuid())
+  url       String
+  postId    String?
+  commentId String?
+
+  createdAt DateTime @default(now())
+
+  post    CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+}
