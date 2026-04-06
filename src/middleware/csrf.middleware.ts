@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 
+const useCrossSiteCookies =
+  process.env.NODE_ENV === "production" ||
+  process.env.RENDER === "true" ||
+  !!process.env.RENDER_EXTERNAL_URL;
+
 // Public paths exempt from CSRF protection (unauthenticated endpoints)
 // Refresh is exempt so the browser can bootstrap its session before it has a CSRF token.
 const CSRF_EXEMPT_PATHS = [
@@ -48,8 +53,8 @@ export function setCsrfCookie(req: Request, res: Response, next: NextFunction) {
     const token = crypto.randomBytes(32).toString("hex");
     res.cookie("csrf_token", token, {
       httpOnly: false, // must be readable by JS
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: useCrossSiteCookies,
+      sameSite: useCrossSiteCookies ? "none" : "lax",
     });
   }
   next();

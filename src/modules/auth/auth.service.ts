@@ -30,11 +30,16 @@ const mapUserToResponse = (user: any): IUser => ({
 // HELPER — Set HTTP-Only Cookie
 //////////////////////////////////////////////////////
 
+const useCrossSiteCookies =
+  process.env.NODE_ENV === "production" ||
+  process.env.RENDER === "true" ||
+  !!process.env.RENDER_EXTERNAL_URL;
+
 const setTokenCookie = (res: Response, token: string) => {
   res.cookie("access_token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: useCrossSiteCookies,
+    sameSite: useCrossSiteCookies ? "none" : "lax",
     maxAge: 1000 * 60 * 60 * 24, // 24 hours
   });
 };
@@ -327,8 +332,8 @@ export const getMe = async (req: Request, res: Response) => {
 export const logoutUser = (_req: Request, res: Response) => {
   res.clearCookie("access_token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: useCrossSiteCookies,
+    sameSite: useCrossSiteCookies ? "none" : "lax",
   });
 
   return res.json({ message: AuthMessages.LOGOUT_SUCCESS });
